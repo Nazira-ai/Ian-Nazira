@@ -1,0 +1,5 @@
+{
+  "name": "Koperasi MASTER",
+  "description": "A comprehensive e-commerce and point-of-sale web application for Koperasi MASTER, featuring product browsing, shopping cart, user authentication with different roles (Super Admin, Admin, Cashier, Buyer), and a mock database to simulate full functionality.",
+  "requestFramePermissions": []
+}

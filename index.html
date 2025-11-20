@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/logo.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Koperasi MASTER</title>
+    <link rel="manifest" href="/manifest.json" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              'primary': '#1D4ED8',
+              'primary-hover': '#2563EB',
+              'secondary': '#64748B',
+              'accent': '#F59E0B',
+              'background': '#F1F5F9',
+              'surface': '#FFFFFF',
+              'on-surface': '#1E293B',
+            },
+            keyframes: {
+              'fade-in-up': {
+                '0%': {
+                  opacity: '0',
+                  transform: 'translateY(10px)'
+                },
+                '100%': {
+                  opacity: '1',
+                  transform: 'translateY(0)'
+                },
+              },
+              'slide-in-down': {
+                '0%': {
+                  opacity: '0',
+                  transform: 'translateY(-20px)'
+                },
+                '100%': {
+                  opacity: '1',
+                  transform: 'translateY(0)'
+                },
+              },
+              'fade-out': {
+                '0%': {
+                  opacity: '1',
+                },
+                '100%': {
+                  opacity: '0',
+                },
+              }
+            },
+            animation: {
+              'fade-in-up': 'fade-in-up 0.5s ease-out',
+              'slide-in-down': 'slide-in-down 0.5s ease-out forwards',
+              'fade-out': 'fade-out 0.5s ease-out forwards'
+            }
+          },
+        },
+      }
+    </script>
+<script type="importmap">
+{
+  "imports": {
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body class="bg-background text-on-surface">
+    <div id="root"></div>
+    <script defer src="/bundle.js"></script>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>
