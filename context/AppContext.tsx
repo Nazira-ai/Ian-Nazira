@@ -1,5 +1,7 @@
+
 import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
 import { Page, User, Product, CartItem, PaymentMethod, AboutPageContent, BankName, DigitalWalletProvider } from '../types';
+import { api } from '../services/api';
 
 interface BankDetails {
   bankName: string;
@@ -95,6 +97,8 @@ const defaultAboutContent: AboutPageContent = {
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [currentPage, _setCurrentPage] = useState<Page>(Page.HOME);
   const [currentPageId, setCurrentPageId] = useState<number | string | null>(null);
+  
+  // User & Cart still use localStorage for session persistence across refreshes
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     const savedUser = localStorage.getItem('currentUser');
     return savedUser ? JSON.parse(savedUser) : null;
@@ -107,45 +111,67 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const savedCompare = localStorage.getItem('compareItems');
     return savedCompare ? JSON.parse(savedCompare) : [];
   });
+  
   const [isCompareModalOpen, setIsCompareModalOpen] = useState(false);
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
-  const [logoUrl, _setLogoUrl] = useState<string>(() => {
-    return localStorage.getItem('customLogo') || '/logo.svg';
-  });
-  const [enabledPaymentMethods, setEnabledPaymentMethods] = useState<PaymentMethod[]>(() => {
-    const savedMethods = localStorage.getItem('enabledPaymentMethods');
-    // By default, enable all online payment methods if nothing is saved
-    return savedMethods ? JSON.parse(savedMethods) : onlinePaymentMethods;
-  });
-   const [enabledBanks, setEnabledBanks] = useState<BankName[]>(() => {
-    const savedBanks = localStorage.getItem('enabledBanks');
-    return savedBanks ? JSON.parse(savedBanks) : defaultBanks;
-  });
-  const [enabledDigitalWallets, setEnabledDigitalWallets] = useState<DigitalWalletProvider[]>(() => {
-    const savedWallets = localStorage.getItem('enabledDigitalWallets');
-    return savedWallets ? JSON.parse(savedWallets) : defaultWallets;
-  });
-  const [bankDetails, setBankDetails] = useState<BankDetails | null>(() => {
-    const savedDetails = localStorage.getItem('bankDetails');
-    return savedDetails ? JSON.parse(savedDetails) : null;
-  });
+  
+  // Settings loaded from DB (initially defaults, then updated)
+  const [logoUrl, _setLogoUrl] = useState<string>('/logo.svg');
+  const [enabledPaymentMethods, _setEnabledPaymentMethods] = useState<PaymentMethod[]>(onlinePaymentMethods);
+  const [enabledBanks, _setEnabledBanks] = useState<BankName[]>(defaultBanks);
+  const [enabledDigitalWallets, _setEnabledDigitalWallets] = useState<DigitalWalletProvider[]>(defaultWallets);
+  const [bankDetails, _setBankDetails] = useState<BankDetails | null>(null);
+  const [lowStockThreshold, _setLowStockThreshold] = useState<number>(5);
+  const [applicationFee, _setApplicationFee] = useState<number>(0);
+  const [aboutPageContent, _setAboutPageContent] = useState<AboutPageContent>(defaultAboutContent);
+
   const [featuredProductId, _setFeaturedProductId] = useState<number | null>(() => {
     const savedId = localStorage.getItem('featuredProductId');
     return savedId ? JSON.parse(savedId) : null;
   });
+  
   const [toast, setToast] = useState<Toast | null>(null);
-  const [lowStockThreshold, _setLowStockThreshold] = useState<number>(() => {
-    const savedThreshold = localStorage.getItem('lowStockThreshold');
-    return savedThreshold ? JSON.parse(savedThreshold) : 5; // Default to 5
-  });
-  const [applicationFee, _setApplicationFee] = useState<number>(() => {
-    const savedFee = localStorage.getItem('applicationFee');
-    return savedFee ? JSON.parse(savedFee) : 0; // Default to 0
-  });
-  const [aboutPageContent, _setAboutPageContent] = useState<AboutPageContent>(() => {
-    const savedContent = localStorage.getItem('aboutPageContent');
-    return savedContent ? JSON.parse(savedContent) : defaultAboutContent;
-  });
+
+  // Load Settings from Supabase on Mount
+  useEffect(() => {
+    const initSettings = async () => {
+        try {
+            // Load Site Settings
+            const settings = await api.fetchSiteSettings();
+            if (settings) {
+                if (settings.logoUrl) _setLogoUrl(settings.logoUrl);
+                if (settings.enabledPaymentMethods) _setEnabledPaymentMethods(settings.enabledPaymentMethods);
+                if (settings.enabledBanks) _setEnabledBanks(settings.enabledBanks);
+                if (settings.enabledDigitalWallets) _setEnabledDigitalWallets(settings.enabledDigitalWallets);
+                if (settings.bankDetails) _setBankDetails(settings.bankDetails);
+                if (settings.lowStockThreshold !== undefined) _setLowStockThreshold(settings.lowStockThreshold);
+                if (settings.applicationFee !== undefined) _setApplicationFee(settings.applicationFee);
+            } else {
+                // Initialize default settings in DB if none exist
+                await api.updateSiteSettings({
+                    logoUrl: '/logo.svg',
+                    enabledPaymentMethods: onlinePaymentMethods,
+                    enabledBanks: defaultBanks,
+                    enabledDigitalWallets: defaultWallets,
+                    lowStockThreshold: 5,
+                    applicationFee: 0
+                });
+            }
+
+            // Load About Page
+            const about = await api.fetchAboutPage();
+            if (about) {
+                _setAboutPageContent(about);
+            } else {
+                await api.updateAboutPage(defaultAboutContent);
+            }
+        } catch (error) {
+            console.error("Failed to load settings from DB:", error);
+        }
+    };
+    initSettings();
+  }, []);
+
 
   useEffect(() => {
     if (currentUser) {
@@ -162,34 +188,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   useEffect(() => {
     localStorage.setItem('compareItems', JSON.stringify(compareItems));
   }, [compareItems]);
-
-  useEffect(() => {
-    if (logoUrl && logoUrl !== '/logo.svg') {
-      localStorage.setItem('customLogo', logoUrl);
-    } else {
-      localStorage.removeItem('customLogo');
-    }
-  }, [logoUrl]);
-
-  useEffect(() => {
-    localStorage.setItem('enabledPaymentMethods', JSON.stringify(enabledPaymentMethods));
-  }, [enabledPaymentMethods]);
-
-  useEffect(() => {
-    localStorage.setItem('enabledBanks', JSON.stringify(enabledBanks));
-  }, [enabledBanks]);
-
-  useEffect(() => {
-    localStorage.setItem('enabledDigitalWallets', JSON.stringify(enabledDigitalWallets));
-  }, [enabledDigitalWallets]);
-
-  useEffect(() => {
-    if (bankDetails) {
-      localStorage.setItem('bankDetails', JSON.stringify(bankDetails));
-    } else {
-      localStorage.removeItem('bankDetails');
-    }
-  }, [bankDetails]);
   
   useEffect(() => {
     if (featuredProductId) {
@@ -199,17 +197,63 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   }, [featuredProductId]);
 
-  useEffect(() => {
-    localStorage.setItem('lowStockThreshold', JSON.stringify(lowStockThreshold));
-  }, [lowStockThreshold]);
 
-  useEffect(() => {
-    localStorage.setItem('applicationFee', JSON.stringify(applicationFee));
-  }, [applicationFee]);
+  // Wrapper setters that update state AND save to DB
+  const setLogoUrl = (url: string) => {
+    _setLogoUrl(url);
+    api.updateSiteSettings({ logoUrl: url });
+  };
 
-  useEffect(() => {
-    localStorage.setItem('aboutPageContent', JSON.stringify(aboutPageContent));
-  }, [aboutPageContent]);
+  const setEnabledPaymentMethods: React.Dispatch<React.SetStateAction<PaymentMethod[]>> = (value) => {
+      // Handle functional update
+      _setEnabledPaymentMethods(prev => {
+          const newVal = value instanceof Function ? value(prev) : value;
+          api.updateSiteSettings({ enabledPaymentMethods: newVal });
+          return newVal;
+      });
+  };
+
+  const setEnabledBanks: React.Dispatch<React.SetStateAction<BankName[]>> = (value) => {
+      _setEnabledBanks(prev => {
+          const newVal = value instanceof Function ? value(prev) : value;
+          api.updateSiteSettings({ enabledBanks: newVal });
+          return newVal;
+      });
+  };
+
+   const setEnabledDigitalWallets: React.Dispatch<React.SetStateAction<DigitalWalletProvider[]>> = (value) => {
+      _setEnabledDigitalWallets(prev => {
+          const newVal = value instanceof Function ? value(prev) : value;
+          api.updateSiteSettings({ enabledDigitalWallets: newVal });
+          return newVal;
+      });
+  };
+
+  const setBankDetails = (details: BankDetails | null) => {
+    _setBankDetails(details);
+    api.updateSiteSettings({ bankDetails: details });
+  };
+
+  const setLowStockThreshold = (threshold: number) => {
+    _setLowStockThreshold(threshold);
+    api.updateSiteSettings({ lowStockThreshold: threshold });
+  };
+
+  const setApplicationFee = (fee: number) => {
+    _setApplicationFee(fee);
+    api.updateSiteSettings({ applicationFee: fee });
+  };
+
+  const setAboutPageContent = (content: AboutPageContent) => {
+    _setAboutPageContent(content);
+    api.updateAboutPage(content);
+  };
+  
+  // Featured Product ID is simpler, can stay local or use DB if needed. 
+  // For now keeping it local storage via effect above.
+  const setFeaturedProductId = (id: number | null) => {
+    _setFeaturedProductId(id);
+  };
 
   const showToast = (message: string, type: ToastType) => {
     setToast({ message, type });
@@ -298,25 +342,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const openLogoutModal = () => setIsLogoutModalOpen(true);
   const closeLogoutModal = () => setIsLogoutModalOpen(false);
 
-  const setLogoUrl = (url: string) => {
-    _setLogoUrl(url);
-  };
-
-  const setFeaturedProductId = (id: number | null) => {
-    _setFeaturedProductId(id);
-  };
-
-  const setLowStockThreshold = (threshold: number) => {
-    _setLowStockThreshold(threshold);
-  };
-
-  const setApplicationFee = (fee: number) => {
-    _setApplicationFee(fee);
-  };
-  
-  const setAboutPageContent = (content: AboutPageContent) => {
-    _setAboutPageContent(content);
-  };
 
   return (
     <AppContext.Provider
